@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Milano Transit Simulator</title>
+  <meta name="description" content="Interactive simulation of Milan's metro, tram, trolleybus and bus network, built on the City of Milan open data.">
+  <meta name="theme-color" content="#07080b">
+  <meta property="og:title" content="Milano Transit Simulator">
+  <meta property="og:description" content="Interactive simulation of Milan's public transport network (metro M1–M5, trams, trolleybuses, buses).">
+  <meta property="og:image" content="https://developermatt02.github.io/milano-transit-simulator/docs/images/screenshot-metro.png">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23F12D2D'/%3E%3Ctext x='16' y='22' font-family='Arial' font-weight='700' font-size='15' text-anchor='middle' fill='white'%3EMI%3C/text%3E%3C/svg%3E">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="map" aria-label="Map"></div>
+  <div id="ambient-overlay" class="ambient-day" aria-hidden="true"></div>
+
+  <!-- ================================================================== HEADER -->
+  <header id="main-header" class="glass-panel">
+    <div class="logo-container">
+      <div class="brand-badge" aria-hidden="true">MI</div>
+      <h1>Milano <span class="accent-title" id="app-title-accent" data-i18n="header.accent.metro">Metro</span></h1>
+      <span class="sim-badge" data-i18n="header.simulated">SIMULATO</span>
+    </div>
+
+    <div class="network-page-switcher glass-inner" role="tablist">
+      <button id="btn-page-metro" class="page-switch-btn active" role="tab" aria-selected="true" data-i18n="header.view.metro" data-i18n-title="header.view.metroTitle">METRO</button>
+      <button id="btn-page-surface" class="page-switch-btn" role="tab" aria-selected="false" data-i18n="header.view.surface" data-i18n-title="header.view.surfaceTitle">SUPERFICIE</button>
+    </div>
+
+    <div class="simulation-controls">
+      <div class="time-realtime-toggle hidden" id="realtime-toggle">
+        <label class="switch-container" for="realtime-checkbox">
+          <input type="checkbox" id="realtime-checkbox" checked>
+          <span class="switch-slider"></span>
+        </label>
+        <span id="realtime-label" class="control-label active" data-i18n="header.realtime">Tempo reale</span>
+      </div>
+
+      <div class="playback-controls-group hidden" id="manual-controls">
+        <button id="btn-play-pause" class="control-btn" data-i18n-title="header.playPause" data-i18n-aria-label="header.playPause">
+          <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+          <svg class="icon-play hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <select id="select-speed" class="speed-selector" data-i18n-title="header.speed" data-i18n-aria-label="header.speed">
+          <option value="1">1×</option>
+          <option value="2">2×</option>
+          <option value="5">5×</option>
+          <option value="10">10×</option>
+          <option value="30">30×</option>
+          <option value="60">60×</option>
+        </select>
+        <select id="select-day-type" class="speed-selector" data-i18n-title="header.dayType" data-i18n-aria-label="header.dayType">
+          <option value="L" data-i18n="day.L">FERIALE</option>
+          <option value="S" data-i18n="day.S">SABATO</option>
+          <option value="F" data-i18n="day.F">FESTIVO</option>
+        </select>
+      </div>
+
+      <div class="digital-clock-container">
+        <div id="digital-clock" aria-live="off">--:--:--</div>
+        <span class="day-badge" id="day-of-week"></span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button id="btn-language" class="icon-btn lang-btn" data-i18n-title="header.language" data-i18n-aria-label="header.language">EN</button>
+      <button id="btn-sound" class="icon-btn" aria-pressed="true">🔊</button>
+      <button id="btn-theme-toggle" class="icon-btn" data-i18n-title="header.theme" data-i18n-aria-label="header.theme">☀️</button>
+    </div>
+  </header>
+
+  <!-- ================================================================== LEFT SIDEBAR -->
+  <aside id="control-sidebar" class="glass-panel collapsed">
+    <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-expanded="false" aria-controls="control-sidebar" data-i18n-aria-label="sidebar.toggle">
+      <span class="arrow-icon" aria-hidden="true">❯</span>
+    </button>
+
+    <nav class="sidebar-tabs" role="tablist">
+      <button class="tab-trigger active" data-tab="tab-lines" id="tab-btn-lines" role="tab" data-i18n="tabs.lines">LINEE</button>
+      <button class="tab-trigger" data-tab="tab-stations" id="tab-btn-stations" role="tab" data-i18n="tabs.stations">STAZIONI</button>
+      <button class="tab-trigger" data-tab="tab-vehicles" id="tab-btn-vehicles" role="tab" data-i18n="tabs.vehicles">MEZZI</button>
+    </nav>
+
+    <div class="sidebar-content">
+      <!-- Lines -->
+      <section class="tab-panel active" id="tab-lines" role="tabpanel" aria-labelledby="tab-btn-lines">
+        <h2 id="lines-panel-title" data-i18n="lines.metroTitle">Rete metropolitana</h2>
+        <p class="section-description" id="lines-panel-desc" data-i18n="lines.metroDesc"></p>
+
+        <div class="surface-filters-container hidden" id="surface-filters">
+          <div class="surface-filter-pills-row">
+            <button class="filter-pill active" data-filter="ALL" data-i18n="filter.ALL">Tutti</button>
+            <button class="filter-pill" data-filter="TRAM" data-i18n="filter.TRAM">Tram</button>
+            <button class="filter-pill" data-filter="FILOBUS" data-i18n="filter.FILOBUS">Filobus</button>
+            <button class="filter-pill" data-filter="BUS" data-i18n="filter.BUS">Bus</button>
+          </div>
+          <div class="surface-line-search-box">
+            <input type="search" id="surface-line-search-input" autocomplete="off" data-i18n-placeholder="lines.searchPlaceholder" data-i18n-aria-label="lines.searchPlaceholder">
+            <span class="search-icon" aria-hidden="true">🔍</span>
+          </div>
+        </div>
+
+        <div class="lines-list" id="lines-container"></div>
+
+        <div class="network-stats-panel glass-inner">
+          <h3 data-i18n="stats.title">Statistiche di rete</h3>
+          <div class="stat-grid">
+            <div class="stat-box">
+              <span class="stat-val" id="stat-active-vehicles">0</span>
+              <span class="stat-lbl" data-i18n="stats.running">Mezzi in viaggio</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-val" id="stat-trips">0</span>
+              <span class="stat-lbl" data-i18n="stats.tripsToday">Corse programmate</span>
+            </div>
+            <div class="stat-box">
+              <span class="stat-val" id="stat-stations">0</span>
+              <span class="stat-lbl" id="stat-stations-label" data-i18n="stats.stations">Stazioni</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="disclaimer" data-i18n="disclaimer"></p>
+      </section>
+
+      <!-- Stations -->
+      <section class="tab-panel" id="tab-stations" role="tabpanel" aria-labelledby="tab-btn-stations">
+        <h2 data-i18n="stations.title">Stazioni e partenze</h2>
+        <div class="search-box">
+          <input type="search" id="station-search-input" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="search-autocomplete-results" data-i18n-placeholder="stations.searchMetro" data-i18n-aria-label="stations.searchMetro">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <div id="search-autocomplete-results" class="autocomplete-list hidden" role="listbox"></div>
+        </div>
+        <div class="placeholder-msg">
+          <div class="placeholder-icon" aria-hidden="true">🚉</div>
+          <p data-i18n="stations.placeholder"></p>
+        </div>
+      </section>
+
+      <!-- Vehicles -->
+      <section class="tab-panel" id="tab-vehicles" role="tabpanel" aria-labelledby="tab-btn-vehicles">
+        <h2 data-i18n="vehicles.title">Mezzi in circolazione</h2>
+        <h3 class="list-heading"><span data-i18n="vehicles.active">Mezzi attivi</span> (<span id="active-vehicles-count">0</span>)</h3>
+        <div class="trains-list" id="active-vehicles-list"></div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- ================================================================== RIGHT DETAIL PANEL -->
+  <aside id="right-detail-panel" class="glass-panel collapsed" aria-live="polite">
+    <button id="btn-close-right-panel" class="close-btn" data-i18n-aria-label="panel.close" data-i18n-title="panel.close">×</button>
+    <div id="right-panel-content"></div>
+  </aside>
+
+  <!-- ================================================================== TIMELINE (simulation mode) -->
+  <footer id="bottom-timeline-panel" class="glass-panel hidden">
+    <div class="timeline-slider-row">
+      <span class="time-lbl">03:00</span>
+      <input type="range" id="timeline-range" min="10800" max="97199" step="30" value="32400" data-i18n-aria-label="timeline.label">
+      <span class="time-lbl">03:00</span>
+    </div>
+    <div class="timeline-presets">
+      <span class="preset-title" data-i18n="timeline.presets">Scenari:</span>
+      <button class="preset-btn" data-time="27000" data-i18n="timeline.morning"></button>
+      <button class="preset-btn" data-time="50400" data-i18n="timeline.afternoon"></button>
+      <button class="preset-btn" data-time="64800" data-i18n="timeline.evening"></button>
+      <button class="preset-btn" data-time="82800" data-i18n="timeline.night"></button>
+      <button class="preset-btn" data-time="88200" data-i18n="timeline.afterMidnight"></button>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script src="js/utils.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/data/metro-network.js"></script>
+  <script src="js/data/metro-frequencies.js"></script>
+  <script src="js/data/surface-network.js"></script>
+  <script src="js/scheduler.js"></script>
+  <script src="js/simulation-engine.js"></script>
+  <script src="js/map-engine.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

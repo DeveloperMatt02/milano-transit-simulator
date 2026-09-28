@@ -1,0 +1,23 @@
+{
+  "name": "milano-transit-simulator",
+  "version": "1.0.0",
+  "description": "Interactive simulation of Milan's public transport network (metro, trams, trolleybuses, buses) built on the City of Milan open data.",
+  "private": true,
+  "license": "MIT",
+  "author": "Matteo Trossi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DeveloperMatt02/milano-transit-simulator.git"
+  },
+  "homepage": "https://developermatt02.github.io/milano-transit-simulator/",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node --test \"tests/js/*.test.js\"",
+    "test:py": "python3 -m unittest discover -s tests/python -v",
+    "data:download": "python3 scripts/download_open_data.py",
+    "data:build": "python3 scripts/build_metro_network.py && python3 scripts/build_metro_frequencies.py && python3 scripts/build_surface_network.py"
+  }
+}
