@@ -1,69 +1,58 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-theme="noorda-light">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Milano Transit Simulator</title>
   <meta name="description" content="Interactive simulation of Milan's metro, tram, trolleybus and bus network, built on the City of Milan open data.">
-  <meta name="theme-color" content="#07080b">
+  <meta name="theme-color" content="#ffffff">
   <meta property="og:title" content="Milano Transit Simulator">
   <meta property="og:description" content="Interactive simulation of Milan's public transport network (metro M1–M5, trams, trolleybuses, buses).">
   <meta property="og:image" content="https://developermatt02.github.io/milano-transit-simulator/docs/images/screenshot-metro.png">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23F12D2D'/%3E%3Ctext x='16' y='22' font-family='Arial' font-weight='700' font-size='15' text-anchor='middle' fill='white'%3EMI%3C/text%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23E2231A'/%3E%3Ctext x='16' y='22' font-family='Arial' font-weight='700' font-size='15' text-anchor='middle' fill='white'%3EMI%3C/text%3E%3C/svg%3E">
+
+  <!-- Apply the saved theme before first paint to avoid a flash of the wrong palette. -->
+  <script>
+    (function () {
+      var pref = "auto";
+      try { pref = localStorage.getItem("mts.theme") || "auto"; } catch (e) {}
+      if (["auto", "noorda-light", "noorda-dark", "fiord"].indexOf(pref) === -1) pref = "auto";
+      var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = pref === "auto" ? (dark ? "noorda-dark" : "noorda-light") : pref;
+    })();
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" crossorigin="">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="preload">
 
   <div id="map" aria-label="Map"></div>
   <div id="ambient-overlay" class="ambient-day" aria-hidden="true"></div>
 
   <!-- ================================================================== HEADER -->
-  <header id="main-header" class="glass-panel">
+  <header id="main-header" class="panel">
     <div class="logo-container">
       <div class="brand-badge" aria-hidden="true">MI</div>
       <h1>Milano <span class="accent-title" id="app-title-accent" data-i18n="header.accent.metro">Metro</span></h1>
       <span class="sim-badge" data-i18n="header.simulated">SIMULATO</span>
     </div>
 
-    <div class="network-page-switcher glass-inner" role="tablist">
+    <div class="network-page-switcher" role="tablist">
       <button id="btn-page-metro" class="page-switch-btn active" role="tab" aria-selected="true" data-i18n="header.view.metro" data-i18n-title="header.view.metroTitle">METRO</button>
       <button id="btn-page-surface" class="page-switch-btn" role="tab" aria-selected="false" data-i18n="header.view.surface" data-i18n-title="header.view.surfaceTitle">SUPERFICIE</button>
     </div>
 
     <div class="simulation-controls">
-      <div class="time-realtime-toggle hidden" id="realtime-toggle">
-        <label class="switch-container" for="realtime-checkbox">
-          <input type="checkbox" id="realtime-checkbox" checked>
-          <span class="switch-slider"></span>
-        </label>
-        <span id="realtime-label" class="control-label active" data-i18n="header.realtime">Tempo reale</span>
-      </div>
-
-      <div class="playback-controls-group hidden" id="manual-controls">
-        <button id="btn-play-pause" class="control-btn" data-i18n-title="header.playPause" data-i18n-aria-label="header.playPause">
-          <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
-          <svg class="icon-play hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
-        </button>
-        <select id="select-speed" class="speed-selector" data-i18n-title="header.speed" data-i18n-aria-label="header.speed">
-          <option value="1">1×</option>
-          <option value="2">2×</option>
-          <option value="5">5×</option>
-          <option value="10">10×</option>
-          <option value="30">30×</option>
-          <option value="60">60×</option>
-        </select>
-        <select id="select-day-type" class="speed-selector" data-i18n-title="header.dayType" data-i18n-aria-label="header.dayType">
-          <option value="L" data-i18n="day.L">FERIALE</option>
-          <option value="S" data-i18n="day.S">SABATO</option>
-          <option value="F" data-i18n="day.F">FESTIVO</option>
-        </select>
-      </div>
-
+      <label class="toggle hidden desktop-only" id="realtime-toggle">
+        <input type="checkbox" id="realtime-checkbox" class="realtime-input" checked>
+        <span class="toggle-track" aria-hidden="true"></span>
+        <span class="toggle-label" data-i18n="header.realtime">Tempo reale</span>
+      </label>
       <div class="digital-clock-container">
         <div id="digital-clock" aria-live="off">--:--:--</div>
         <span class="day-badge" id="day-of-week"></span>
@@ -72,21 +61,24 @@
 
     <div class="header-actions">
       <button id="btn-language" class="icon-btn lang-btn" data-i18n-title="header.language" data-i18n-aria-label="header.language">EN</button>
-      <button id="btn-sound" class="icon-btn" aria-pressed="true">🔊</button>
-      <button id="btn-theme-toggle" class="icon-btn" data-i18n-title="header.theme" data-i18n-aria-label="header.theme">☀️</button>
+      <button id="btn-settings" class="icon-btn" data-i18n-title="settings.open" data-i18n-aria-label="settings.open">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Zm8.3 4.6-1.6-.9a6.9 6.9 0 0 0 0-2.4l1.6-.9a.6.6 0 0 0 .2-.8l-1.6-2.8a.6.6 0 0 0-.8-.2l-1.6.9a7 7 0 0 0-2.1-1.2V3a.6.6 0 0 0-.6-.6h-3.2a.6.6 0 0 0-.6.6v1.8a7 7 0 0 0-2.1 1.2l-1.6-.9a.6.6 0 0 0-.8.2L3.9 8.1a.6.6 0 0 0 .2.8l1.6.9a6.9 6.9 0 0 0 0 2.4l-1.6.9a.6.6 0 0 0-.2.8l1.6 2.8c.2.3.5.4.8.2l1.6-.9c.6.5 1.3.9 2.1 1.2V21c0 .3.3.6.6.6h3.2c.3 0 .6-.3.6-.6v-1.8c.8-.3 1.5-.7 2.1-1.2l1.6.9c.3.2.6.1.8-.2l1.6-2.8a.6.6 0 0 0-.2-.8Z"/></svg>
+      </button>
     </div>
   </header>
 
-  <!-- ================================================================== LEFT SIDEBAR -->
-  <aside id="control-sidebar" class="glass-panel collapsed">
+  <!-- ================================================================== SIDEBAR / PHONE SHEET -->
+  <aside id="control-sidebar" class="panel sheet collapsed" data-snap="half">
     <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-expanded="false" aria-controls="control-sidebar" data-i18n-aria-label="sidebar.toggle">
       <span class="arrow-icon" aria-hidden="true">❯</span>
     </button>
+    <div class="sheet-grabber" aria-hidden="true"><span></span></div>
 
     <nav class="sidebar-tabs" role="tablist">
       <button class="tab-trigger active" data-tab="tab-lines" id="tab-btn-lines" role="tab" data-i18n="tabs.lines">LINEE</button>
       <button class="tab-trigger" data-tab="tab-stations" id="tab-btn-stations" role="tab" data-i18n="tabs.stations">STAZIONI</button>
       <button class="tab-trigger" data-tab="tab-vehicles" id="tab-btn-vehicles" role="tab" data-i18n="tabs.vehicles">MEZZI</button>
+      <button class="tab-trigger" data-tab="tab-settings" id="tab-btn-settings" role="tab" data-i18n="tabs.settings">OPZIONI</button>
     </nav>
 
     <div class="sidebar-content">
@@ -102,16 +94,15 @@
             <button class="filter-pill" data-filter="FILOBUS" data-i18n="filter.FILOBUS">Filobus</button>
             <button class="filter-pill" data-filter="BUS" data-i18n="filter.BUS">Bus</button>
           </div>
-          <div class="surface-line-search-box">
+          <div class="search-field">
             <input type="search" id="surface-line-search-input" autocomplete="off" data-i18n-placeholder="lines.searchPlaceholder" data-i18n-aria-label="lines.searchPlaceholder">
-            <span class="search-icon" aria-hidden="true">🔍</span>
           </div>
         </div>
 
         <div class="lines-list" id="lines-container"></div>
 
-        <div class="network-stats-panel glass-inner">
-          <h3 data-i18n="stats.title">Statistiche di rete</h3>
+        <div class="network-stats-panel">
+          <h3 class="label" data-i18n="stats.title">Statistiche di rete</h3>
           <div class="stat-grid">
             <div class="stat-box">
               <span class="stat-val" id="stat-active-vehicles">0</span>
@@ -134,41 +125,98 @@
       <!-- Stations -->
       <section class="tab-panel" id="tab-stations" role="tabpanel" aria-labelledby="tab-btn-stations">
         <h2 data-i18n="stations.title">Stazioni e partenze</h2>
-        <div class="search-box">
+        <div class="search-field search-box">
           <input type="search" id="station-search-input" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="search-autocomplete-results" data-i18n-placeholder="stations.searchMetro" data-i18n-aria-label="stations.searchMetro">
-          <span class="search-icon" aria-hidden="true">🔍</span>
           <div id="search-autocomplete-results" class="autocomplete-list hidden" role="listbox"></div>
         </div>
-        <div class="placeholder-msg">
-          <div class="placeholder-icon" aria-hidden="true">🚉</div>
-          <p data-i18n="stations.placeholder"></p>
-        </div>
+        <p class="placeholder-msg" data-i18n="stations.placeholder"></p>
       </section>
 
       <!-- Vehicles -->
       <section class="tab-panel" id="tab-vehicles" role="tabpanel" aria-labelledby="tab-btn-vehicles">
         <h2 data-i18n="vehicles.title">Mezzi in circolazione</h2>
-        <h3 class="list-heading"><span data-i18n="vehicles.active">Mezzi attivi</span> (<span id="active-vehicles-count">0</span>)</h3>
+        <h3 class="label list-heading"><span data-i18n="vehicles.active">Mezzi attivi</span> · <span id="active-vehicles-count">0</span></h3>
         <div class="trains-list" id="active-vehicles-list"></div>
+      </section>
+
+      <!-- Settings -->
+      <section class="tab-panel" id="tab-settings" role="tabpanel" aria-labelledby="tab-btn-settings">
+        <h2 data-i18n="settings.title">Opzioni</h2>
+
+        <fieldset class="setting">
+          <legend class="label" data-i18n="settings.theme">Stile</legend>
+          <div class="theme-options" id="theme-options">
+            <label class="theme-option"><input type="radio" name="theme" value="auto" id="theme-auto"><span class="swatch swatch-auto" aria-hidden="true"></span><span><strong data-i18n="theme.auto">Automatico</strong><small data-i18n="theme.autoDesc"></small></span></label>
+            <label class="theme-option"><input type="radio" name="theme" value="noorda-light" id="theme-noorda-light"><span class="swatch swatch-noorda-light" aria-hidden="true"></span><span><strong data-i18n="theme.noordaLight">Noorda chiaro</strong><small data-i18n="theme.noordaLightDesc"></small></span></label>
+            <label class="theme-option"><input type="radio" name="theme" value="noorda-dark" id="theme-noorda-dark"><span class="swatch swatch-noorda-dark" aria-hidden="true"></span><span><strong data-i18n="theme.noordaDark">Noorda scuro</strong><small data-i18n="theme.noordaDarkDesc"></small></span></label>
+            <label class="theme-option"><input type="radio" name="theme" value="fiord" id="theme-fiord"><span class="swatch swatch-fiord" aria-hidden="true"></span><span><strong data-i18n="theme.fiord">Fiord</strong><small data-i18n="theme.fiordDesc"></small></span></label>
+          </div>
+        </fieldset>
+
+        <fieldset class="setting">
+          <legend class="label" data-i18n="settings.language">Lingua</legend>
+          <div class="segmented" id="language-options">
+            <button type="button" data-lang="it" id="lang-it">Italiano</button>
+            <button type="button" data-lang="en" id="lang-en">English</button>
+          </div>
+        </fieldset>
+
+        <div class="setting setting-row">
+          <label class="toggle" for="sound-checkbox">
+            <input type="checkbox" id="sound-checkbox">
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span class="toggle-label" data-i18n="settings.sound">Suoni dell'interfaccia</span>
+          </label>
+        </div>
+
+        <div class="setting setting-row hidden" id="settings-realtime">
+          <label class="toggle" for="realtime-checkbox-settings">
+            <input type="checkbox" id="realtime-checkbox-settings" class="realtime-input" checked>
+            <span class="toggle-track" aria-hidden="true"></span>
+            <span class="toggle-label" data-i18n="header.realtime">Tempo reale</span>
+          </label>
+        </div>
+
+        <p class="disclaimer" data-i18n="settings.about"></p>
       </section>
     </div>
   </aside>
 
-  <!-- ================================================================== RIGHT DETAIL PANEL -->
-  <aside id="right-detail-panel" class="glass-panel collapsed" aria-live="polite">
+  <!-- ================================================================== DETAIL PANEL / PHONE SHEET -->
+  <aside id="right-detail-panel" class="panel sheet collapsed" data-snap="half" aria-live="polite">
+    <div class="sheet-grabber" aria-hidden="true"><span></span></div>
     <button id="btn-close-right-panel" class="close-btn" data-i18n-aria-label="panel.close" data-i18n-title="panel.close">×</button>
     <div id="right-panel-content"></div>
   </aside>
 
   <!-- ================================================================== TIMELINE (simulation mode) -->
-  <footer id="bottom-timeline-panel" class="glass-panel hidden">
-    <div class="timeline-slider-row">
-      <span class="time-lbl">03:00</span>
-      <input type="range" id="timeline-range" min="10800" max="97199" step="30" value="32400" data-i18n-aria-label="timeline.label">
-      <span class="time-lbl">03:00</span>
+  <footer id="bottom-timeline-panel" class="panel hidden">
+    <div class="timeline-controls">
+      <button id="btn-play-pause" class="control-btn" data-i18n-title="header.playPause" data-i18n-aria-label="header.playPause">
+        <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        <svg class="icon-play hidden" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <select id="select-speed" class="select" data-i18n-title="header.speed" data-i18n-aria-label="header.speed">
+        <option value="1">1×</option>
+        <option value="2">2×</option>
+        <option value="5">5×</option>
+        <option value="10">10×</option>
+        <option value="30">30×</option>
+        <option value="60">60×</option>
+      </select>
+      <select id="select-day-type" class="select" data-i18n-title="header.dayType" data-i18n-aria-label="header.dayType">
+        <option value="L" data-i18n="day.L">FERIALE</option>
+        <option value="S" data-i18n="day.S">SABATO</option>
+        <option value="F" data-i18n="day.F">FESTIVO</option>
+      </select>
+      <div class="timeline-slider-row">
+        <span class="time-lbl">03:00</span>
+        <input type="range" id="timeline-range" min="10800" max="97199" step="30" value="32400" data-i18n-aria-label="timeline.label">
+        <span class="time-lbl">03:00</span>
+      </div>
     </div>
     <div class="timeline-presets">
-      <span class="preset-title" data-i18n="timeline.presets">Scenari:</span>
+      <span class="label preset-title" data-i18n="timeline.presets">Scenari:</span>
       <button class="preset-btn" data-time="27000" data-i18n="timeline.morning"></button>
       <button class="preset-btn" data-time="50400" data-i18n="timeline.afternoon"></button>
       <button class="preset-btn" data-time="64800" data-i18n="timeline.evening"></button>
@@ -177,17 +225,37 @@
     </div>
   </footer>
 
+  <!-- ================================================================== PHONE TAB BAR -->
+  <nav id="mobile-tabbar" aria-label="Sezioni" data-i18n-aria-label="tabs.nav">
+    <button data-tab="tab-lines" class="mtab">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span data-i18n="tabs.linesShort">Linee</span>
+    </button>
+    <button data-tab="tab-stations" class="mtab">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg><span data-i18n="tabs.stationsShort">Stazioni</span>
+    </button>
+    <button data-tab="tab-vehicles" class="mtab">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="3" width="12" height="14" rx="3"/><path d="M6 11h12M9 21l1.5-4M15 21l-1.5-4"/></svg><span data-i18n="tabs.vehiclesShort">Mezzi</span>
+    </button>
+    <button data-tab="tab-settings" class="mtab">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span data-i18n="tabs.settingsShort">Opzioni</span>
+    </button>
+  </nav>
+
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js" crossorigin=""></script>
+  <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js" crossorigin=""></script>
 
   <script src="js/utils.js"></script>
   <script src="js/i18n.js"></script>
   <script src="js/audio.js"></script>
+  <script src="js/themes.js"></script>
   <script src="js/data/metro-network.js"></script>
   <script src="js/data/metro-frequencies.js"></script>
   <script src="js/data/surface-network.js"></script>
   <script src="js/scheduler.js"></script>
   <script src="js/simulation-engine.js"></script>
   <script src="js/map-engine.js"></script>
+  <script src="js/sheet.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

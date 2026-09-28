@@ -2,6 +2,7 @@
 
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES2020-F7DF1E?logo=javascript&logoColor=black)
 ![Leaflet](https://img.shields.io/badge/Leaflet-1.9-199900?logo=leaflet&logoColor=white)
+![MapLibre](https://img.shields.io/badge/MapLibre_GL-5-396CB2?logo=maplibre&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 [![CI](https://github.com/DeveloperMatt02/milano-transit-simulator/actions/workflows/ci.yml/badge.svg)](https://github.com/DeveloperMatt02/milano-transit-simulator/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
@@ -16,7 +17,7 @@
 
 ATM does not publish real-time vehicle positions as open data. What *is* public is a summary of every route: how many trips run in the peak, off-peak and evening bands, and when the first and last runs are. **Milano Transit Simulator** turns those numbers into a synthetic, deterministic timetable and animates every vehicle on a map, so you can see what the network looks like at 08:00 on a weekday, at 00:30 on a Saturday night, or right now.
 
-Everything runs in the browser: there is no backend, no API key and no build step. The whole app is a static site served by GitHub Pages.
+Everything runs in the browser: there is no backend, no API key and no build step. The base map comes from [OpenFreeMap](https://openfreemap.org), an open, key-free vector tile service built on OpenStreetMap. The whole app is a static site served by GitHub Pages.
 
 > ⚠️ **Positions are simulated, not live.** This is an independent portfolio project and is not affiliated with ATM S.p.A.
 
@@ -29,7 +30,9 @@ Everything runs in the browser: there is no backend, no API key and no build ste
 5. **Vehicle tracking** — follow a train or bus: current segment, average speed, terminus arrival and upcoming stops.
 6. **Time travel** — with `?simulation` in the URL you can pause, play at up to 60×, pick a day type and jump to preset scenarios (morning rush, after midnight…).
 7. **Bilingual UI** — Italian and English, switchable at runtime (`?lang=it` / `?lang=en`).
-8. **Light / dark theme**, reactive ambient lighting that follows the simulated time of day, and a responsive layout for phones.
+8. **Three visual styles** — *Noorda* light and dark, inspired by Bob Noorda's 1964 wayfinding for the Milan metro, and *Fiord*, a control-room look. *Automatic* follows the device's light/dark setting.
+9. **Built for phones** — bottom tab bar, draggable bottom sheets with snap points, 44 px touch targets and safe-area support; two-panel layout on tablets.
+10. **Accessible** — WCAG AA contrast for text and line badges (checked by a unit test), keyboard navigation, visible focus and reduced motion.
 
 ## 🧠 Architecture
 
@@ -46,7 +49,7 @@ graph LR
     subgraph browser [Browser]
         F --> G(TransitScheduler<br/>synthetic timetable)
         G --> H(TransitSimulation<br/>clock + vehicle positions)
-        H --> I(TransitMap<br/>Leaflet rendering)
+        H --> I(TransitMap<br/>Leaflet + MapLibre GL)
         H --> J(app.js<br/>panels, boards, i18n)
     end
 ```
@@ -56,7 +59,7 @@ The scheduler turns service levels into stop-by-stop trips, the simulation compu
 ## 🛠️ Tech stack
 
 * **Frontend:** vanilla JavaScript (no framework, no bundler), HTML, CSS
-* **Maps:** [Leaflet](https://leafletjs.com/) with [CARTO](https://carto.com/basemaps) basemaps
+* **Maps:** [Leaflet](https://leafletjs.com/) for the network layers, [MapLibre GL JS](https://maplibre.org/) (via [maplibre-gl-leaflet](https://github.com/maplibre/maplibre-gl-leaflet)) for the [OpenFreeMap](https://openfreemap.org) vector base map, with an OpenStreetMap raster fallback when WebGL is unavailable
 * **Data pipeline:** Python 3 (standard library only)
 * **Testing:** Node.js built-in test runner (`node:test`) and Python `unittest`
 * **CI/CD:** GitHub Actions (tests on every push, automatic deploy to GitHub Pages)
@@ -78,7 +81,7 @@ cd milano-transit-simulator
 python3 -m http.server 8000   # or: npm start
 ```
 
-Then open <http://localhost:8000>. An internet connection is required for the map tiles, Leaflet and web fonts.
+Then open <http://localhost:8000>. An internet connection is required for the map tiles, the map libraries and the web fonts.
 
 ### URL parameters
 
@@ -115,9 +118,11 @@ milano-transit-simulator/
 │   ├── utils.js                # Geo maths, service-day time, holidays, escaping
 │   ├── i18n.js                 # Italian / English dictionaries
 │   ├── audio.js                # Synthesised UI sounds (Web Audio API)
+│   ├── themes.js               # Noorda light/dark and Fiord: base map style, line colours
+│   ├── sheet.js                # Draggable bottom sheets for phones
 │   ├── scheduler.js            # Service levels -> stop-by-stop timetable
 │   ├── simulation-engine.js    # Clock, vehicle positions, departure boards
-│   ├── map-engine.js           # Leaflet layers and markers
+│   ├── map-engine.js           # Base map, network layers and markers
 │   ├── app.js                  # UI controller
 │   └── data/                   # Generated datasets (metro network, frequencies, surface network)
 ├── scripts/                    # Python data pipeline
@@ -130,19 +135,19 @@ milano-transit-simulator/
 
 ## 📸 Screenshots
 
-| Departure board | Vehicle tracking |
+| Noorda (light) | Fiord |
 | --- | --- |
-| ![Departure board at Cadorna](docs/images/screenshot-station.png) | ![Tracking an M1 train](docs/images/screenshot-vehicle.png) |
+| ![Departure board at Cadorna, Noorda light style](docs/images/screenshot-station.png) | ![Tracking an M1 train, Fiord style](docs/images/screenshot-vehicle.png) |
 
-| Surface line (trolleybus 90) | Mobile |
+| Noorda (dark) · surface line | Phone |
 | --- | --- |
-| ![Circular trolleybus line 90](docs/images/screenshot-surface.png) | <img src="docs/images/screenshot-mobile.png" alt="Mobile layout" width="260"> |
+| ![Tram line 15, Noorda dark style](docs/images/screenshot-surface.png) | <img src="docs/images/screenshot-mobile.png" alt="Phone layout with bottom sheet and tab bar" width="260"> |
 
 ## 📊 Data sources & attribution
 
 * **Timetable summaries, surface stops and routes:** [Comune di Milano – Open Data](https://dati.comune.milano.it), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (timetable *INV2024-2025*).
 * **Metro station coordinates:** © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, [ODbL](https://opendatacommons.org/licenses/odbl/).
-* **Basemap:** © OpenStreetMap contributors © [CARTO](https://carto.com/attributions).
+* **Basemap:** [OpenFreeMap](https://openfreemap.org) © [OpenMapTiles](https://www.openmaptiles.org/), data © OpenStreetMap contributors.
 
 ## ⚠️ Limitations
 

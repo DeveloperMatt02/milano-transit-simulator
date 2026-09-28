@@ -54,11 +54,20 @@
     let metroTrips = scheduler.generateMetroSchedule(state.dayType);
     const sim = new TransitSimulation(METRO_NETWORK, metroTrips);
 
-    const map = new TransitMap("map", METRO_NETWORK, {
-      onStationClick: (id) => selectStation(id, { focus: false }),
-      onVehicleClick: (tripId) => trackVehicle(tripId),
-      onBackgroundClick: () => closePanel(),
-    });
+    const themes = window.ThemeManager.init();
+    const phoneQuery = window.matchMedia("(max-width: 700px)");
+    const isPhone = () => phoneQuery.matches;
+
+    const map = new TransitMap(
+      "map",
+      METRO_NETWORK,
+      {
+        onStationClick: (id) => selectStation(id, { focus: false }),
+        onVehicleClick: (tripId) => trackVehicle(tripId),
+        onBackgroundClick: () => closePanel(),
+      },
+      { id: themes.current, def: themes.def }
+    );
     map.labels.vehicleTooltip = (v) => `${t(`mode.${v.mode}`)} ${v.lineId} · ${t("panel.to", { dest: v.to })}`;
 
     // ------------------------------------------------------------------ DOM
@@ -69,9 +78,8 @@
       ambient: $("ambient-overlay"),
       accent: $("app-title-accent"),
       realtimeToggle: $("realtime-toggle"),
-      realtimeCheckbox: $("realtime-checkbox"),
-      realtimeLabel: $("realtime-label"),
-      manualControls: $("manual-controls"),
+      realtimeSetting: $("settings-realtime"),
+      realtimeInputs: document.querySelectorAll(".realtime-input"),
       playPause: $("btn-play-pause"),
       speed: $("select-speed"),
       dayType: $("select-day-type"),
@@ -98,8 +106,9 @@
       btnMetro: $("btn-page-metro"),
       btnSurface: $("btn-page-surface"),
       btnLanguage: $("btn-language"),
-      btnSound: $("btn-sound"),
-      btnTheme: $("btn-theme-toggle"),
+      btnSettings: $("btn-settings"),
+      soundCheckbox: $("sound-checkbox"),
+      tabbar: $("mobile-tabbar"),
     };
 
     /** Sets innerHTML only when it changed (avoids DOM churn on periodic refreshes). */
@@ -113,10 +122,16 @@
     // ------------------------------------------------------------------ helpers
     const network = () => (state.view === "metro" ? METRO_NETWORK : SURFACE_NETWORK);
     const lineOf = (lineId) => network().lines[lineId];
-    const colorOf = (lineId) => (lineOf(lineId) || {}).color || "#007AFF";
-    const modeClass = (lineId) => (state.view === "surface" && lineOf(lineId) ? lineOf(lineId).type : "");
-    const badge = (lineId, cls = "mini-circle-badge") =>
-      `<span class="${cls} ${modeClass(lineId)}" style="--line-color:${colorOf(lineId)}">${esc(lineId)}</span>`;
+    const colorOf = (lineId) => {
+      if (state.view === "metro") return map.lineColor(lineId);
+      const line = lineOf(lineId);
+      return line ? map.modeColor(line.type, line.color) : "#1165B0";
+    };
+    const badge = (lineId, cls = "mini-circle-badge") => {
+      const color = colorOf(lineId);
+      const dark = U.prefersDarkText(color) ? " badge-dark-text" : "";
+      return `<span class="${cls}${dark}" style="--line-color:${color}">${esc(lineId)}</span>`;
+    };
     const minutesLabel = (seconds) =>
       seconds < 60 ? t("panel.lessThanMinute") : t("panel.minutes", { n: Math.round(seconds / 60) });
     const vehiclesLabel = (n) => t("vehicles.count", { n });
@@ -298,7 +313,7 @@
       } else {
         state.surfaceLineId = lineId;
         map.clearVehicles();
-        map.drawSurfaceLine(SURFACE_NETWORK.lines[lineId], SURFACE_NETWORK);
+        map.drawSurfaceLine(SURFACE_NETWORK.lines[lineId], SURFACE_NETWORK, coveredArea());
         sim.setTrips(SURFACE_NETWORK, scheduler.generateSurfaceSchedule(lineId, SURFACE_NETWORK, state.dayType));
         openPanel({ type: "line", id: lineId });
       }
@@ -318,7 +333,12 @@
       map.setSelectedStation(panel.type === "station" ? panel.id : null);
       el.panel.classList.remove("collapsed");
       document.body.classList.add("detail-open");
-      if (window.matchMedia("(max-width: 600px)").matches) setSidebar(false);
+      if (isPhone()) {
+        setSidebar(false);
+        detailSheet.set(panel.type === "line" ? "half" : "peek");
+      } else if (window.innerWidth <= 1024 && panel.type !== "line") {
+        setSidebar(false); // tablets: leave room for the map between the two panels
+      }
       if (!silent) sounds.chime();
       renderPanel();
     }
@@ -375,7 +395,7 @@
           <div class="data-box"><span class="data-lbl">${esc(t("panel.frequency"))}</span><span class="data-val" data-live="line-frequency"></span></div>
         </div>
         <div class="data-box wide"><span class="data-lbl">${esc(t("panel.termini"))}</span><span class="data-val">${esc(route)}</span></div>
-        <h4 class="board-title">${esc(t(isMetro ? "panel.stationsList" : "panel.stopsList"))}</h4>
+        <h4 class="label board-title">${esc(t(isMetro ? "panel.stationsList" : "panel.stopsList"))}</h4>
         <div class="stop-list">
           ${stops
             .map((id) => network().stations[id])
@@ -395,7 +415,7 @@
       el.panelContent.innerHTML = `
         <div class="panel-header"><h3>${esc(s.name)}</h3></div>
         <div class="station-badge-row">${(s.lines || []).map((l) => badge(l, "mini-line-badge")).join("")}</div>
-        <h4 class="board-title">${esc(t("panel.departures"))}</h4>
+        <h4 class="label board-title">${esc(t("panel.departures"))}</h4>
         <div class="timetable-grid" data-live="departures"></div>`;
     }
 
@@ -412,7 +432,7 @@
           <div class="data-box"><span class="data-lbl">${esc(t("panel.terminusArrival"))}</span><span class="data-val">${U.formatClock(trip.endTime, false)}</span></div>
         </div>
         <div data-live="progress"></div>
-        <h4 class="board-title spaced">${esc(t("panel.upcoming"))}</h4>
+        <h4 class="label board-title spaced">${esc(t("panel.upcoming"))}</h4>
         <div class="timetable-grid" data-live="upcoming"></div>`;
     }
 
@@ -420,13 +440,15 @@
     function coveredArea() {
       const header = document.getElementById("main-header");
       const pad = { left: 0, right: 0, top: header.offsetTop + header.offsetHeight, bottom: 0 };
-      if (!el.sidebar.classList.contains("collapsed") && el.sidebar.offsetWidth < window.innerWidth * 0.6) {
-        pad.left = el.sidebar.offsetLeft + el.sidebar.offsetWidth;
+      if (isPhone()) {
+        const base = bottomChromeHeight();
+        const sheet = state.panel ? detailSheet : !el.sidebar.classList.contains("collapsed") ? sidebarSheet : null;
+        pad.bottom = base + (sheet ? sheet.heights()[sheet.state] || 0 : 0);
+        return pad;
       }
-      if (state.panel) {
-        if (el.panel.offsetWidth < window.innerWidth * 0.6) pad.right = window.innerWidth - el.panel.offsetLeft;
-        else pad.bottom = window.innerHeight - el.panel.offsetTop;
-      }
+      if (!el.sidebar.classList.contains("collapsed")) pad.left = el.sidebar.offsetLeft + el.sidebar.offsetWidth;
+      if (state.panel) pad.right = window.innerWidth - el.panel.offsetLeft;
+      if (!el.timeline.classList.contains("hidden")) pad.bottom = window.innerHeight - el.timeline.offsetTop;
       return pad;
     }
 
@@ -675,48 +697,126 @@
       renderLinesList();
     });
 
-    // ------------------------------------------------------------------ sidebar & tabs
+    // ------------------------------------------------------------------ sidebar, tabs & phone sheets
+    /** Height of the fixed chrome at the bottom of the screen on phones (tab bar + timeline). */
+    function bottomChromeHeight() {
+      const tabbar = el.tabbar.offsetHeight || 0;
+      const timeline = el.timeline.classList.contains("hidden") ? 0 : el.timeline.offsetHeight;
+      return tabbar + timeline;
+    }
+
+    /** Vertical space available to a sheet between the header and the bottom chrome. */
+    function sheetSpace() {
+      const header = document.getElementById("main-header");
+      const top = header.offsetTop + header.offsetHeight + 8;
+      return Math.max(160, window.innerHeight - top - bottomChromeHeight());
+    }
+
+    const sidebarSheet = new BottomSheet(el.sidebar, el.sidebar.querySelector(".sheet-grabber"), {
+      media: phoneQuery,
+      initial: "half",
+      snaps: () => {
+        const space = sheetSpace();
+        return { half: Math.min(space, Math.max(280, space * 0.55)), full: space };
+      },
+      onClose: () => setSidebar(false),
+    });
+
+    const detailSheet = new BottomSheet(el.panel, el.panel.querySelector(".sheet-grabber"), {
+      media: phoneQuery,
+      initial: "half",
+      snaps: () => {
+        const space = sheetSpace();
+        return { peek: Math.min(space, 230), half: Math.min(space, Math.max(300, space * 0.55)), full: space };
+      },
+      onClose: () => closePanel(),
+    });
+
+    let activeTab = "tab-lines";
+
     function setSidebar(open) {
       el.sidebar.classList.toggle("collapsed", !open);
       el.sidebarToggle.setAttribute("aria-expanded", String(open));
+      el.tabbar.querySelectorAll(".mtab").forEach((b) => b.setAttribute("aria-selected", String(open && b.dataset.tab === activeTab)));
     }
-    el.sidebarToggle.addEventListener("click", () => setSidebar(el.sidebar.classList.contains("collapsed")));
-    if (window.matchMedia("(min-width: 769px)").matches) setTimeout(() => setSidebar(true), 600);
 
-    const tabs = document.querySelectorAll(".tab-trigger");
-    tabs.forEach((tab) =>
+    function activateTab(tabId) {
+      activeTab = tabId;
+      document.querySelectorAll(".tab-trigger").forEach((x) => {
+        x.classList.toggle("active", x.dataset.tab === tabId);
+        x.setAttribute("aria-selected", String(x.dataset.tab === tabId));
+      });
+      document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === tabId));
+      el.sidebar.querySelector(".sidebar-content").scrollTop = 0;
+      el.tabbar.querySelectorAll(".mtab").forEach((b) =>
+        b.setAttribute("aria-selected", String(!el.sidebar.classList.contains("collapsed") && b.dataset.tab === tabId))
+      );
+      el.vehiclesList.__html = null;
+      renderVehicleList();
+    }
+
+    el.sidebarToggle.addEventListener("click", () => setSidebar(el.sidebar.classList.contains("collapsed")));
+    if (!isPhone()) setTimeout(() => setSidebar(true), 600);
+
+    document.querySelectorAll(".tab-trigger").forEach((tab) =>
       tab.addEventListener("click", () => {
         sounds.click();
-        tabs.forEach((x) => {
-          x.classList.toggle("active", x === tab);
-          x.setAttribute("aria-selected", String(x === tab));
-        });
-        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.toggle("active", p.id === tab.dataset.tab));
-        el.vehiclesList.__html = null;
-        renderVehicleList();
+        activateTab(tab.dataset.tab);
       })
     );
 
+    el.tabbar.addEventListener("click", (e) => {
+      const btn = e.target.closest(".mtab");
+      if (!btn) return;
+      sounds.click();
+      const open = !el.sidebar.classList.contains("collapsed");
+      if (open && activeTab === btn.dataset.tab && !state.panel) {
+        setSidebar(false);
+        return;
+      }
+      if (state.panel) closePanel();
+      activateTab(btn.dataset.tab);
+      setSidebar(true);
+      sidebarSheet.set(sidebarSheet.state === "full" ? "full" : "half");
+    });
+
+    el.btnSettings.addEventListener("click", () => {
+      sounds.click();
+      activateTab("tab-settings");
+      setSidebar(true);
+    });
+
+    phoneQuery.addEventListener("change", () => {
+      sidebarSheet.apply();
+      detailSheet.apply();
+      if (!isPhone() && el.sidebar.classList.contains("collapsed")) setSidebar(true);
+    });
+
     // ------------------------------------------------------------------ time controls
     function syncTimeControls() {
-      el.realtimeCheckbox.checked = sim.isRealTime;
-      el.realtimeLabel.classList.toggle("active", sim.isRealTime);
-      el.manualControls.classList.toggle("hidden", sim.isRealTime);
+      el.realtimeInputs.forEach((input) => (input.checked = sim.isRealTime));
       el.timeline.classList.toggle("hidden", sim.isRealTime);
       document.body.classList.toggle("timeline-open", !sim.isRealTime);
       el.timelineRange.value = Math.round(sim.simTime);
       el.playPause.querySelector(".icon-play").classList.toggle("hidden", sim.isPlaying);
       el.playPause.querySelector(".icon-pause").classList.toggle("hidden", !sim.isPlaying);
+      sidebarSheet.apply();
+      detailSheet.apply();
     }
 
-    if (simulationMode) el.realtimeToggle.classList.remove("hidden");
+    if (simulationMode) {
+      el.realtimeToggle.classList.remove("hidden");
+      el.realtimeSetting.classList.remove("hidden");
+    }
 
-    el.realtimeCheckbox.addEventListener("change", () => {
-      sounds.click();
-      sim.setRealTimeMode(el.realtimeCheckbox.checked);
-      if (sim.isRealTime) setDayType(U.dayTypeFor(U.milanClock()));
-      syncTimeControls();
-    });
+    el.realtimeInputs.forEach((input) =>
+      input.addEventListener("change", () => {
+        sounds.click();
+        sim.setRealTimeMode(input.checked);
+        if (sim.isRealTime) setDayType(U.dayTypeFor(U.milanClock()));
+        syncTimeControls();
+      })
+    );
     el.playPause.addEventListener("click", () => {
       sounds.click();
       sim.setPlaying(!sim.isPlaying);
@@ -743,44 +843,51 @@
       })
     );
 
-    // ------------------------------------------------------------------ header actions
-    function applyTheme(theme) {
-      document.body.classList.toggle("light-theme", theme === "light");
-      el.btnTheme.textContent = theme === "light" ? "🌙" : "☀️";
-      document.querySelector('meta[name="theme-color"]').content = theme === "light" ? "#f0f2f5" : "#07080b";
-      map.setTheme(theme);
+    // ------------------------------------------------------------------ settings: theme, language, sound
+    const themeInputs = document.querySelectorAll('input[name="theme"]');
+    function syncThemeInputs() {
+      themeInputs.forEach((input) => (input.checked = input.value === themes.preference));
     }
-    el.btnTheme.addEventListener("click", () => {
-      sounds.click();
-      const theme = document.body.classList.contains("light-theme") ? "dark" : "light";
-      U.storage.set("mts.theme", theme);
-      applyTheme(theme);
+    themeInputs.forEach((input) =>
+      input.addEventListener("change", () => {
+        if (!input.checked) return;
+        sounds.click();
+        themes.setPreference(input.value);
+      })
+    );
+    themes.onChange((id, def) => {
+      map.setTheme({ id, def });
+      syncThemeInputs();
+      el.lines.__html = null;
+      renderLinesList();
+      el.vehiclesList.__html = null;
+      renderVehicleList();
+      renderPanel();
     });
 
-    function syncSoundButton() {
-      el.btnSound.textContent = sounds.enabled ? "🔊" : "🔇";
-      el.btnSound.setAttribute("aria-pressed", String(sounds.enabled));
-      const key = sounds.enabled ? "header.soundOn" : "header.soundOff";
-      el.btnSound.title = t(key);
-      el.btnSound.setAttribute("aria-label", t(key));
-    }
-    el.btnSound.addEventListener("click", () => {
-      sounds.enabled = !sounds.enabled;
+    el.soundCheckbox.addEventListener("change", () => {
+      sounds.enabled = el.soundCheckbox.checked;
       U.storage.set("mts.sound", sounds.enabled ? "on" : "off");
-      syncSoundButton();
       sounds.click();
     });
 
-    function syncLanguageButton() {
-      el.btnLanguage.textContent = window.I18N.getLanguage() === "it" ? "EN" : "IT";
+    function syncLanguageControls() {
+      const lang = window.I18N.getLanguage();
+      el.btnLanguage.textContent = lang === "it" ? "EN" : "IT";
+      document.querySelectorAll("#language-options button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
     }
     el.btnLanguage.addEventListener("click", () => {
       sounds.click();
       window.I18N.setLanguage(window.I18N.getLanguage() === "it" ? "en" : "it");
     });
+    document.getElementById("language-options").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-lang]");
+      if (!b) return;
+      sounds.click();
+      window.I18N.setLanguage(b.dataset.lang);
+    });
     window.I18N.onChange(() => {
-      syncLanguageButton();
-      syncSoundButton();
+      syncLanguageControls();
       el.dayBadge.textContent = t(`day.${state.dayType}`);
       updateStats();
       el.lines.__html = null;
@@ -791,17 +898,19 @@
     });
 
     // ------------------------------------------------------------------ boot
-    applyTheme(U.storage.get("mts.theme", "dark"));
-    syncLanguageButton();
-    syncSoundButton();
+    el.soundCheckbox.checked = sounds.enabled;
+    syncThemeInputs();
+    syncLanguageControls();
     setDayType(state.dayType);
     syncTimeControls();
+    activateTab("tab-lines");
     renderLinesList();
     refreshUi();
     requestAnimationFrame(frame);
+    setTimeout(() => document.body.classList.remove("preload"), 400);
 
     // Exposed for debugging from the browser console.
-    window.mts = { state, sim, scheduler, map };
+    window.mts = { state, sim, scheduler, map, themes };
   }
 
   /** Adds `lines` (ids of the lines serving it) to every surface stop. */

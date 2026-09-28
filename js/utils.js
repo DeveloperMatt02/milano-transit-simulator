@@ -148,6 +148,19 @@
     return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})`;
   }
 
+  /** True when white text on this background would fail WCAG AA contrast (e.g. yellow M3), so dark text is needed. */
+  function prefersDarkText(hex) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
+    if (!m) return false;
+    const [r, g, b] = [m[1], m[2], m[3]].map((h) => {
+      const c = parseInt(h, 16) / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    // White text is kept whenever it meets WCAG AA (4.5:1); otherwise dark text is used.
+    return 1.05 / (luminance + 0.05) < 4.5;
+  }
+
   /** Safe localStorage wrapper (storage can be unavailable in private mode or file://). */
   const storage = {
     get(key, fallback = null) {
@@ -183,6 +196,7 @@
     milanClock,
     escapeHtml,
     hexToRgba,
+    prefersDarkText,
     storage,
   };
 
