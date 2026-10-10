@@ -1,9 +1,12 @@
 name: CI
 
+# Runs on pull requests and on pushes to any branch but main; on main the tests run
+# as the first job of the deploy workflow (pages.yml), which calls this file.
 on:
   push:
-    branches: [main]
+    branches-ignore: [main]
   pull_request:
+  workflow_call:
 
 jobs:
   javascript:
@@ -17,11 +20,14 @@ jobs:
       - run: npm test
 
   python:
-    name: Data pipeline tests
+    name: Data pipeline tests (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.10", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
       - run: python -m unittest discover -s tests/python -v

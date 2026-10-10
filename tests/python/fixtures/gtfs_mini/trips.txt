@@ -1,0 +1,9 @@
+route_id,service_id,trip_id,trip_headsign,trip_short_name,direction_id,block_id,shape_id,wheelchair_accessible,x_trip_desc,x_shape_id_order
+M1,m_wd,m1_a,delta fs,,,,S1,,,
+M1,m_wd,m1_b,delta fs,,,,S1,,,
+M1,m_sat,m1_c,gamma,,,,S1,,,
+M1,m_sun,m1_d,alfa,,,,S2,,,
+M1,old,m1_old,delta fs,,,,S1,,,
+T15,t_wd,t15_a,rozzano,,,,S3,,,
+B90,b_all,b90_a,circolare,,,,S3,,,
+BN25,b_all,n25_a,notturna,,,,,,,

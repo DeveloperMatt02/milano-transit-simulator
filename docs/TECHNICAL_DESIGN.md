@@ -14,6 +14,7 @@
 6. [Departure boards and statistics](#6-departure-boards-and-statistics)
 7. [Assumptions and limitations](#7-assumptions-and-limitations)
 8. [Possible extensions](#8-possible-extensions)
+9. [GTFS datasets (format v1)](#9-gtfs-datasets-format-v1)
 
 ---
 
@@ -160,3 +161,54 @@ The sidebar statistics are computed, not hard-coded: vehicles currently running,
 * Add the suburban railway (Passante / S lines) and the M4/M5 extensions as they open.
 * Heat-map mode showing frequency per segment and time of day.
 * Journey planner between two stations using the synthetic timetable.
+
+## 9. GTFS datasets (format v1)
+
+Built by `scripts/build_gtfs.py` from the Comune di Milano / AMAT GTFS feed ([ADR 0002](adr/0002-gtfs-primary-data-source.md), [ADR 0004](adr/0004-gtfs-dataset-format-and-refresh.md)) into `data/gtfs/`. The files are not committed: the deploy workflow rebuilds them twice a week. They are read by the Dart core from F3; the JS Lite app keeps using `js/data/`.
+
+### 9.1 Pipeline
+
+1. **Calendar** — `calendar.txt` (weekday flags over a date range) and `calendar_dates.txt` (additions/removals) give the dates of every service. The window covers 14 days from the build day (Europe/Rome) **plus the previous service day**, whose trips after midnight are still running in the early hours of the first day: 15 days, `window.start` = build day − 1. Each service becomes a bit mask over the window (bit *i* = day *i*); services with the same mask are stored once.
+2. **Trips** — for every route, `coverage_end` is the last date with trips in the *whole* feed. Only trips whose service runs inside the window are kept.
+3. **Stop times** — streamed (the file is ~440 MB); rows are collected per window trip because a trip's rows are scattered through the file, then sorted by `stop_sequence`. Stops without times (non-timepoints) are interpolated, repeated `stop_sequence` values are dropped, non-monotonic times are clamped, trips without a time at the first or last stop or with an unknown route are skipped — all counted in the warnings. A full-network window takes ≈ 26 s and ≈ 820 MB of RAM.
+4. **Deduplication** — a *pattern* is route + headsign + stop list + shape; a *profile* is a pattern + arrival offsets + dwell times. A trip is `(start, profile, service)`. On the real feed, ~122,000 trips in a full-network window use ~790 patterns and ~8,000 profiles.
+5. **Stops and stations** — only stops used by window trips. Metro stops are matched to the stations of `js/data/metro-network.js` (nearest station on the same line within 400 m, so `LORETO M1` and `LORETO M2` become `loreto`); surface stops keep the readable `tpl_fermate.csv` name when the id matches.
+6. **Shapes** — Douglas-Peucker with a 5 m tolerance (≈ 6× fewer points), Google encoded polyline with precision 5.
+7. **Output** — written to a temporary directory, checked against the 5 MB gzip budget, then copied over the previous output.
+
+### 9.2 Files
+
+All files carry `"version": 1`. Indices are positions in arrays: `stop`/`station` indices in `network.json`; `pattern.route` → `network.routes`; `pattern.shape` → `shapes.shapes`; `profile.pattern` → `network.patterns`; `trips.profile` → `timetable.profiles`; `trips.service` → `timetable.services`.
+
+**`network.json`**
+
+```jsonc
+{
+  "stops":    [{ "id": "11490", "name": "…", "lat": 45.46, "lon": 9.19, "wheelchair": 0 | 1 | 2, "station": "duomo" | null }],
+  "stations": [{ "id": "duomo", "name": "Duomo", "lat": 45.46, "lon": 9.19, "lines": ["M1", "M3"], "stops": [12, 13] }],  // metro only
+  "routes":   [{ "id": "M1", "name": "M1", "long_name": "M1 - Linea Rossa", "mode": "METRO" | "TRAM" | "FILOBUS" | "BUS",
+                 "color": "#FF0000" | null, "coverage_end": "2026-10-19" }],
+  "patterns": [{ "route": 0, "headsign": "Bisceglie", "stops": [12, 40, 41], "shape": 3 | null }]
+}
+```
+
+**`timetable.json`**
+
+```jsonc
+{
+  "window":   { "start": "2026-10-09", "days": 15 },   // previous service day + 14 days
+  "services": [31, 96],                               // bit masks over the window days
+  "profiles": [{ "pattern": 0, "arrivals": [0, 90, 185], "dwells": [0, 20, 0] }],  // seconds; dwells omitted when all 0
+  "trips":    { "start": [19800, 20400], "profile": [0, 0], "service": [0, 0] }    // columnar, sorted by start
+}
+```
+
+**Times are GTFS times**, not the service-day model of §3: seconds after *noon minus 12 h* of the service date (midnight, except on the two daylight-saving days: 01:00 of the same day when clocks go back, e.g. 2026-10-25; 23:00 of the previous day when they go forward in March). For a trip and a stop *i*: arrival = `start + arrivals[i]`, departure = arrival + `dwells[i]`. The feed mixes two conventions for night trips: some start at 24:00 or later on their service date (≈ 4,500 in a full window, e.g. `25:30` for 01:30), others start before 03:00 on the next service date (≈ 760, night lines NM1–NM4, N25, 90…). The engine must convert every trip to wall-clock time (service date + time) before mapping it to the service-day timeline, and must not assume `start ≥ 03:00`.
+
+**`shapes.json`** — `{ "precision": 5, "shapes": ["encoded polyline", …] }`.
+
+**`meta.json`** — feed publisher and version, `start_date`, the per-mode `end_dates` declared by the feed, `last_service_date`, window, build time, counts, warnings and the CC BY attribution to show in the app.
+
+### 9.3 Using the data
+
+A route is served by GTFS on service date *d* when **all** of these hold: the route is in `network.routes`, *d* is inside the window (`window.start ≤ d < window.start + days`) and `d ≤ coverage_end`. Then the GTFS trips are authoritative — no trips that day means no service. In every other case (route missing, date outside the window, date after `coverage_end`, dataset missing) the app falls back to the synthetic timetable for that route and says so. A trip runs on window day *i* when `services[trip.service] >> i & 1`. Coverage is partial between 00:00 and 03:00 after the last window day: night trips that the feed dates to the following day (starting before 03:00) are not in the window, so the engine treats those hours like a date outside the window.

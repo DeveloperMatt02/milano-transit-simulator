@@ -1,6 +1,9 @@
 # Raw open-data downloads (re-create with: python scripts/download_open_data.py)
 data/raw/
 
+# GTFS datasets: rebuilt by CI from the live feed (python scripts/build_gtfs.py)
+data/gtfs/
+
 # Python
 __pycache__/
 *.py[cod]

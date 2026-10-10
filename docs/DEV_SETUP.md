@@ -16,10 +16,12 @@ npm run bench       # engine micro-benchmark (informational)
 The pipeline reads the feed from `data/raw/gtfs.zip` (git-ignored):
 
 ```bash
-curl -L --create-dirs -o data/raw/gtfs.zip https://dati.comune.milano.it/gtfs.zip   # ~60 MB, varies by release
+python3 scripts/download_open_data.py --gtfs          # feed (~35-60 MB, validated) + tpl_fermate/tpl_orari CSVs
+python3 scripts/build_gtfs.py                         # -> data/gtfs/ (≈15-30 s, up to ≈1 GB RAM for a full-network window)
+GTFS_REAL=1 python3 -m unittest tests.python.test_gtfs.RealFeed   # optional smoke test on the real feed
 ```
 
-In CI the scheduled workflow downloads it by itself.
+In CI the deploy workflow downloads and builds it by itself (Monday and Thursday, plus every push to `main`).
 
 ## F2 onwards · Flutter
 

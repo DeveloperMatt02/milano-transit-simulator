@@ -1,0 +1,5 @@
+route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color,x_accessibilita_linea,x_ordinamento_linea
+M1,AMAT_Milan_feed,1,m1 - linea rossa,,1,,ff0000,,1,
+T15,AMAT_Milan_feed,15,duomo - rozzano,,0,,,,1,
+B90,AMAT_Milan_feed,90,circolare esterna,,3,,,,1,
+BN25,AMAT_Milan_feed,N25,notturna,,3,,,,1,

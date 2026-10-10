@@ -1,6 +1,6 @@
 # ADR 0002 · GTFS as primary data source, synthetic timetable as fallback
 
-**Status:** Accepted (2026-10-10)
+**Status:** Accepted (2026-10-10) · refined by [ADR 0004](0004-gtfs-dataset-format-and-refresh.md) (per-route fallback, format, refresh schedule, datasets not committed)
 
 ## Context
 
