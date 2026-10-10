@@ -27,5 +27,17 @@ if grep -q '^  maplibre:' pubspec.yaml; then
   grep -q 'maplibre-gl.js' web/index.html
 fi
 
+# Workaround for maplibre_android 0.3.6: its published build.gradle.kts applies the ktlint
+# Gradle plugin without a version, so the app must declare it (as the package's own example
+# app does in android/settings.gradle.kts).
+if grep -q '^  maplibre:' pubspec.yaml; then
+  settings=android/settings.gradle.kts
+  [ -f "$settings" ] || { echo "expected $settings (Kotlin DSL) from flutter create" >&2; exit 1; }
+  if ! grep -q 'org.jlleitschuh.gradle.ktlint' "$settings"; then
+    sed -i 's#^\([[:space:]]*\)id("dev.flutter.flutter-plugin-loader").*#&\n\1id("org.jlleitschuh.gradle.ktlint") version "14.0.+" apply false#' "$settings"
+  fi
+  grep -q 'org.jlleitschuh.gradle.ktlint' "$settings"
+fi
+
 flutter pub get >/dev/null
 echo "prepared $name in $app_dir"
