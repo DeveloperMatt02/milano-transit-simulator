@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -129,9 +130,32 @@ class _SpikePageState extends State<SpikePage> with SingleTickerProviderStateMix
   bool _benchmarkRunning = false;
   final List<BenchmarkResult> _results = [];
 
+  FlutterExceptionHandler? _previousFlutterOnError;
+  bool Function(Object, StackTrace)? _previousPlatformOnError;
+  Timer? _mapTimeout;
+
+  /// Shows uncaught errors in the HUD: the spike runs on a phone without a debugger.
+  void _reportError(Object error) {
+    if (!mounted) return;
+    setState(() => _error ??= error.toString().split('\n').first);
+  }
+
   @override
   void initState() {
     super.initState();
+    _previousFlutterOnError = FlutterError.onError;
+    FlutterError.onError = (details) {
+      _reportError(details.exception);
+      _previousFlutterOnError?.call(details);
+    };
+    _previousPlatformOnError = PlatformDispatcher.instance.onError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      _reportError(error);
+      return _previousPlatformOnError?.call(error, stack) ?? false;
+    };
+    _mapTimeout = Timer(const Duration(seconds: 20), () {
+      if (mounted && !_mapReady) _reportError('the map did not report ready within 20 s');
+    });
     SchedulerBinding.instance.addTimingsCallback(_onTimings);
     _hudTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (mounted) setState(() {});
@@ -141,6 +165,9 @@ class _SpikePageState extends State<SpikePage> with SingleTickerProviderStateMix
 
   @override
   void dispose() {
+    FlutterError.onError = _previousFlutterOnError;
+    PlatformDispatcher.instance.onError = _previousPlatformOnError;
+    _mapTimeout?.cancel();
     _hudTimer?.cancel();
     SchedulerBinding.instance.removeTimingsCallback(_onTimings);
     _ticker.dispose();
@@ -314,6 +341,7 @@ class _SpikePageState extends State<SpikePage> with SingleTickerProviderStateMix
     final out = StringBuffer()
       ..writeln('Map spike · ${widget.backend.name} · $_platform · ${DateTime.now().toIso8601String()}')
       ..writeln(_results.isEmpty ? '(live values, benchmark not run)' : '(benchmark: 3 s warm-up, 15 s per row)')
+      ..writeln(_error == null ? '' : 'ERROR: $_error')
       ..writeln()
       ..writeln('| vehicles | mode | tick p50 ms | tick p95 ms | ticks > 16.7 ms | update p50 ms | update p95 ms '
           '| build p95 ms | raster p95 ms | updates sent | skipped | RSS MB |')

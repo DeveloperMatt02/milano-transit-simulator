@@ -39,5 +39,16 @@ if grep -q '^  maplibre:' pubspec.yaml; then
   grep -q 'org.jlleitschuh.gradle.ktlint' "$settings"
 fi
 
+# maplibre_android 0.3.6 calls its Kotlin classes from Dart through JNI, by name. Release
+# builds run R8, which renames or removes classes that look unused, and the package's
+# consumer rules only keep org.maplibre.**: without these rules the map never starts.
+# Flutter adds android/app/proguard-rules.pro to the release build automatically.
+if grep -q '^  maplibre:' pubspec.yaml; then
+  cat > android/app/proguard-rules.pro <<'RULES'
+-keep class com.github.josxha.maplibre.** { *; }
+-keep class com.github.dart_lang.jni.** { *; }
+RULES
+fi
+
 flutter pub get >/dev/null
 echo "prepared $name in $app_dir"
