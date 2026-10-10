@@ -1,0 +1,12 @@
+stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,stop_timezone,wheelchair_boarding
+ALFA,,ALFA,,45.4600,9.1800,,,,,Europe/Rome,1
+BETA M1,,BETA M1,,45.4650,9.1900,,,,,Europe/Rome,1
+BETA,,BETA,,45.4652,9.1903,,,,,Europe/Rome,2
+GAMMA,,GAMMA,,45.4700,9.2000,,,,,Europe/Rome,1
+DELTA FS,,DELTA FS,,45.4750,9.2100,,,,,Europe/Rome,1
+101,,p.le cadorna,,45.4680,9.1760,,,,,Europe/Rome,1
+102,,via dante (cordusio),,45.4660,9.1850,,,,,Europe/Rome,
+103,,duomo m1 m3,,45.4640,9.1900,,,,,Europe/Rome,2
+104,,v.le gran sasso,,45.4800,9.2200,,,,,Europe/Rome,1
+105,,l.go augusto,,45.4620,9.1950,,,,,Europe/Rome,1
+999,,unused stop,,45.5000,9.3000,,,,,Europe/Rome,

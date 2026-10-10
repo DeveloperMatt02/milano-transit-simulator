@@ -1,33 +1,114 @@
 name: Deploy to GitHub Pages
 
+# 1. tests   — the deploy never runs when a test fails
+# 2. data    — downloads the latest GTFS feed and builds data/gtfs (rolling 14-day window);
+#              if the portal is down, the last feed saved in the cache is used instead
+# 3. deploy  — JS app + datasets to GitHub Pages; a failed GTFS build only means the site
+#              is published without data/gtfs (the app then uses the synthetic timetable)
+#
+# The schedule keeps the 14-day window moving and picks up new feed releases within days
+# (the feed is published every two to four weeks). Scheduled runs use the default branch;
+# GitHub disables them after 60 days without activity in a public repository.
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: "17 4 * * 1,4" # Monday and Thursday, 04:17 UTC
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  deploy:
+  tests:
+    uses: ./.github/workflows/ci.yml
+
+  data:
+    name: Build GTFS datasets
+    needs: tests
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Restore the last downloaded feed
+        uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: gtfs-raw-latest
+          restore-keys: gtfs-raw-
+
+      - name: Download the latest feed
+        id: download
+        continue-on-error: true
+        run: python scripts/download_open_data.py --gtfs --force
+
+      - name: Save the feed for later runs
+        if: steps.download.outcome == 'success'
+        continue-on-error: true # the same feed may already be cached
+        uses: actions/cache/save@v4
+        with:
+          path: data/raw
+          key: gtfs-raw-${{ hashFiles('data/raw/gtfs.zip') }}
+
+      - name: Build data/gtfs
+        id: build
+        if: hashFiles('data/raw/gtfs.zip') != ''
+        continue-on-error: true
+        run: python scripts/build_gtfs.py --out data/gtfs
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### GTFS datasets"
+            echo "- download: ${{ steps.download.outcome }} (on failure the cached feed is used)"
+            echo "- build: ${{ steps.build.outcome }}"
+            if [ -f data/gtfs/meta.json ]; then
+              python -c "import json; m=json.load(open('data/gtfs/meta.json')); f=m['feed']; print(f\"- feed version {f['version']}, end dates {f['end_dates']}, window {m['window']['start']} + {m['window']['days']} days\"); print('- counts: ' + ', '.join(f'{k} {v}' for k, v in m['counts'].items() if isinstance(v, int)))"
+            else
+              echo "- **no dataset built**: the app uses the synthetic timetable"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.build.outcome == 'success'
+        with:
+          name: gtfs-data
+          path: data/gtfs
+          retention-days: 30
+
+  deploy:
+    name: Deploy
+    needs: data
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: gtfs-data
+          path: _gtfs
       - name: Assemble static site
         run: |
           mkdir -p _site/docs
           cp index.html _site/
           cp -r css js _site/
           cp -r docs/images _site/docs/
+          if [ -d _gtfs ]; then mkdir -p _site/data && cp -r _gtfs _site/data/gtfs; fi
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

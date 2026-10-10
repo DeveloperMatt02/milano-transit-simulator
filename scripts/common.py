@@ -64,6 +64,14 @@ def download(url: str, destination: Path, *, overwrite: bool = False) -> Path:
     return destination
 
 
+def read_js_constant(path: Path):
+    """Parse a data file written by :func:`write_js_constant` back into Python objects."""
+    text = Path(path).read_text(encoding="utf-8")
+    start = text.index("=", text.index("const ")) + 1
+    end = text.rindex("};") + 1
+    return json.loads(text[start:end])
+
+
 def write_js_constant(path: Path, const_name: str, data, header: str, *, compact: bool = False) -> None:
     """Write ``data`` as ``const NAME = {...};`` so it can be loaded with a classic <script> tag.
 
