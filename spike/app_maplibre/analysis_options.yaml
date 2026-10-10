@@ -1,0 +1,11 @@
+# No external lint package (the spike must resolve with the Flutter SDK alone).
+analyzer:
+  language:
+    strict-casts: true
+    strict-raw-types: true
+linter:
+  rules:
+    - avoid_print
+    - prefer_const_constructors
+    - prefer_final_locals
+    - unawaited_futures

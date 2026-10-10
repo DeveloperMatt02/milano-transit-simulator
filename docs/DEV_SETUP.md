@@ -1,6 +1,6 @@
 # Development setup
 
-What you need on your machine, phase by phase. Everything below targets **Ubuntu 20.04 LTS or later**; there is no macOS requirement (iOS is built in CI).
+What you need on your machine, phase by phase. The author's machine runs **Fedora Linux**; commands use `dnf`. There is no macOS requirement (iOS is built in CI).
 
 ## Today (JS Lite + data pipeline)
 
@@ -23,30 +23,44 @@ GTFS_REAL=1 python3 -m unittest tests.python.test_gtfs.RealFeed   # optional smo
 
 In CI the deploy workflow downloads and builds it by itself (Monday and Thursday, plus every push to `main`).
 
-## F2 onwards · Flutter
+## F2 · Map spike (no local toolchain)
 
-Follow the official guide for [Linux → Android](https://docs.flutter.dev/get-started/install/linux/android) (and add Chrome for the web target). In short:
+The spike apps are compiled by GitHub Actions (`.github/workflows/spike.yml`): every push to the `f2-map-spike` branch produces a web build and an Android APK as downloadable artifacts. To test on an Android phone:
+
+1. GitHub → *Actions* → latest *Map spike* run → *Artifacts* → download `apk-…` and unzip it.
+2. Copy the `.apk` to the phone (USB, cloud drive or e-mail) and open it; Android asks to allow installs from that source once.
+3. In the app press **Run benchmark**, wait for the end, press **Copy results** and paste them in the chat.
+
+The web build is tested by unzipping the `web-…` artifact and serving the folder, e.g. `python3 -m http.server 8000 -d web` and opening <http://localhost:8000>.
+
+## F3 onwards · Flutter on Fedora
+
+The official guide targets [Linux → Android](https://docs.flutter.dev/get-started/install/linux/android); on Fedora the steps are the same with `dnf` instead of `apt`:
 
 1. **System packages**
    ```bash
-   sudo apt-get update -y && sudo apt-get install -y curl git unzip xz-utils zip libglu1-mesa
-   sudo apt-get install -y libc6:amd64 libstdc++6:amd64 lib32z1 libbz2-1.0:amd64   # Android Studio
+   sudo dnf install -y curl git unzip xz zip which mesa-libGLU android-tools chromium
+   ```
+   `android-tools` provides `adb` for the phone; `chromium` is the browser Flutter uses for the web target:
+   ```bash
+   echo 'export CHROME_EXECUTABLE=/usr/bin/chromium-browser' >> ~/.bashrc
    ```
 2. **Flutter SDK** — either let VS Code install it (Flutter extension → *Flutter: New Project* → *Download SDK*) or download the stable bundle from the Flutter site and extract it to `~/development/flutter`, then add it to the `PATH`:
    ```bash
    echo 'export PATH="$HOME/development/flutter/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
    ```
-   The exact Flutter version is pinned by the project in F2 (CI and local must match).
-3. **Android Studio** (Koala 2024.1.1 or later) with, from *SDK Manager*: SDK Platform, Command-line Tools, Build-Tools, Platform-Tools, Emulator. Create an emulator with an x86_64 image and *Hardware – GLES 2.0* graphics.
-4. **Licenses and check**
+   Use the same version as CI (printed in the *Map spike* workflow log, pinned at the end of F2).
+3. **Android Studio** — download the Linux `.tar.gz` from developer.android.com, extract it (e.g. to `~/development/android-studio`) and run `bin/studio.sh`. Prefer the tarball over the Flatpak: the Flatpak sandbox hides the Flutter SDK and `adb` from the IDE. From *SDK Manager* install: SDK Platform, Command-line Tools, Build-Tools, Platform-Tools. The bundled JDK (21) is the one the map library needs.
+4. **Phone instead of emulator** — on the OnePlus enable *Developer options* (tap *Build number* seven times) and *USB debugging*, connect it and accept the prompt; `adb devices` must list it. If it shows `no permissions`, unplug/replug after installing `android-tools` (it ships the udev rules) or reboot.
+5. **Emulator (optional)** — needs hardware virtualisation: `grep -cE '(vmx|svm)' /proc/cpuinfo` must print 1 or more, and your user must be able to open `/dev/kvm` (`sudo usermod -aG kvm $USER`, then log out and in). In *Device Manager* create a device with an x86_64 image.
+6. **Licenses and check**
    ```bash
    flutter doctor --android-licenses
    flutter doctor -v
    ```
-   For this project, `flutter doctor` must be green for *Flutter*, *Android toolchain* and *Chrome*. The *Linux toolchain* and *Xcode* lines can be ignored.
-5. **Web** — Google Chrome, or Chromium with `export CHROME_EXECUTABLE=$(which chromium)`.
+   For this project *Flutter*, *Android toolchain* and *Chrome* must be green; *Linux toolchain* and *Xcode* can be ignored.
 
-Hardware: 8 GB RAM is the minimum the Flutter docs list (16 GB recommended) and the Android emulator needs hardware virtualisation (KVM) enabled in the BIOS.
+Hardware: the Flutter docs list 8 GB of RAM as the minimum (16 GB recommended) and ~11 GB of disk.
 
 ## iOS without a Mac
 

@@ -1,0 +1,16 @@
+# Platform folders are generated in CI by tool/prepare.sh (flutter create).
+app_*/android/
+app_*/ios/
+app_*/web/
+app_*/linux/
+app_*/macos/
+app_*/windows/
+app_*/.metadata
+app_*/README.md
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/pubspec.lock
+**/*.iml
+**/.idea/
