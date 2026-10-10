@@ -135,9 +135,15 @@ class _SpikePageState extends State<SpikePage> with SingleTickerProviderStateMix
   Timer? _mapTimeout;
 
   /// Shows uncaught errors in the HUD: the spike runs on a phone without a debugger.
-  void _reportError(Object error) {
+  void _reportError(Object error, [StackTrace? stack]) {
     if (!mounted) return;
-    setState(() => _error ??= error.toString().split('\n').first);
+    var text = error.toString();
+    if (error is PlatformException && error.stacktrace != null) {
+      text += '\n${error.stacktrace}'; // the Java/Kotlin stack trace from the platform side
+    } else if (stack != null) {
+      text += '\n$stack';
+    }
+    setState(() => _error ??= text.length > 4000 ? text.substring(0, 4000) : text);
   }
 
   @override
@@ -145,12 +151,12 @@ class _SpikePageState extends State<SpikePage> with SingleTickerProviderStateMix
     super.initState();
     _previousFlutterOnError = FlutterError.onError;
     FlutterError.onError = (details) {
-      _reportError(details.exception);
+      _reportError(details.exception, details.stack);
       _previousFlutterOnError?.call(details);
     };
     _previousPlatformOnError = PlatformDispatcher.instance.onError;
     PlatformDispatcher.instance.onError = (error, stack) {
-      _reportError(error);
+      _reportError(error, stack);
       return _previousPlatformOnError?.call(error, stack) ?? false;
     };
     _mapTimeout = Timer(const Duration(seconds: 20), () {
@@ -377,7 +383,7 @@ class _SpikePageState extends State<SpikePage> with SingleTickerProviderStateMix
       'build/raster p95: ${_ms(live.buildP95)} / ${_ms(live.rasterP95)} ms',
       'RSS: ${_mb(live.rssBytes)} MB',
       _status,
-      if (_error != null) 'ERROR: $_error',
+      if (_error != null) 'ERROR: ${_error!.split('\n').take(10).join('\n')}',
     ];
     final locked = _benchmarkRunning || !_started;
 

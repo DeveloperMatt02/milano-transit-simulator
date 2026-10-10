@@ -62,19 +62,31 @@ jobs:
       - name: Build web
         run: flutter build web --release
       - name: Build Android APK (arm64)
-        run: flutter build apk --release --target-platform android-arm64
+        run: |
+          flutter build apk --release --target-platform android-arm64
+          mkdir -p apk-out && cp build/app/outputs/flutter-apk/app-release.apk "apk-out/${{ matrix.app }}.apk"
+      # Diagnostics for `maplibre`, whose release APK does not start the map: one build with
+      # Hybrid Composition, one without R8 shrinking (Gradle property `shrink`, read by Flutter).
+      - name: Build diagnostic APK variants (maplibre)
+        if: matrix.app == 'app_maplibre'
+        run: |
+          flutter build apk --release --target-platform android-arm64 --dart-define=ANDROID_MODE=hc
+          cp build/app/outputs/flutter-apk/app-release.apk apk-out/app_maplibre-hc.apk
+          echo "shrink=false" >> android/gradle.properties
+          flutter build apk --release --target-platform android-arm64 --dart-define=SPIKE_VARIANT=no-R8
+          cp build/app/outputs/flutter-apk/app-release.apk apk-out/app_maplibre-no-r8.apk
       - name: Sizes
         run: |
           {
             echo "### ${{ matrix.app }}"
             echo "- Flutter: $(flutter --version | head -1)"
             echo "- web build: $(du -sh build/web | cut -f1) (main.dart.js $(du -h build/web/main.dart.js | cut -f1))"
-            echo "- APK arm64: $(du -h build/app/outputs/flutter-apk/app-release.apk | cut -f1)"
+            for apk in apk-out/*.apk; do echo "- $(basename "$apk"): $(du -h "$apk" | cut -f1)"; done
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: apk-${{ matrix.app }}
-          path: spike/${{ matrix.app }}/build/app/outputs/flutter-apk/app-release.apk
+          path: spike/${{ matrix.app }}/apk-out/*.apk
           retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
