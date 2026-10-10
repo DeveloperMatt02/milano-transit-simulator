@@ -76,6 +76,8 @@ class MetroLine {
 class MetroNetwork {
   const MetroNetwork(this.lines);
 
+  final List<MetroLine> lines;
+
   /// Parses `assets/metro_lines.json`: `{"lines": [{"id", "color", "paths": [[[lon, lat], ...]]}]}`.
   factory MetroNetwork.fromJson(String source) {
     final data = jsonDecode(source) as Map<String, dynamic>;
