@@ -68,6 +68,9 @@ The scheduler turns service levels into stop-by-stop trips, the simulation compu
 
 * [Architecture](docs/ARCHITECTURE.md) — modules, data flow, rendering loop, state
 * [Technical design](docs/TECHNICAL_DESIGN.md) — datasets, timetable synthesis, service-day model, assumptions and limitations
+* [Roadmap](docs/ROADMAP.md) — GTFS timetables and the Flutter app for web, Android and iOS
+* [Architecture decision records](docs/adr/README.md) — why Flutter, why GTFS, the future of this JS version
+* [Development setup](docs/DEV_SETUP.md) — toolchain per phase (Ubuntu, no Mac required)
 
 ## 🚦 Getting started
 
@@ -95,6 +98,7 @@ Then open <http://localhost:8000>. An internet connection is required for the ma
 ```bash
 npm test                                           # JavaScript: data integrity, scheduler, simulation, i18n
 python3 -m unittest discover -s tests/python -v    # Python: data pipeline helpers
+npm run bench                                      # engine micro-benchmark (informational, not a test)
 ```
 
 ### Rebuild the datasets (optional)

@@ -155,7 +155,7 @@ The sidebar statistics are computed, not hard-coded: vehicles currently running,
 
 ## 8. Possible extensions
 
-* Use the city's GTFS feed (if/when available) for real stop-by-stop times instead of synthesised ones.
+* Use the city's GTFS feed for real stop-by-stop times instead of synthesised ones — the feed is now published by the Comune di Milano and is planned for roadmap phase F1 ([ADR 0002](adr/0002-gtfs-primary-data-source.md)).
 * Snap surface routes to the street network (e.g. OSRM or OSM route relations).
 * Add the suburban railway (Passante / S lines) and the M4/M5 extensions as they open.
 * Heat-map mode showing frequency per segment and time of day.
