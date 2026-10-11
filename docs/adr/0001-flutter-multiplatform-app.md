@@ -1,13 +1,13 @@
 # ADR 0001 · Flutter for the multiplatform app
 
-**Status:** Accepted (2026-10-10). The map library is decided by the F2 spike and recorded in a follow-up ADR (0005).
+**Status:** Accepted (2026-10-10). Spike passed and map library chosen on 2026-10-11: [ADR 0005](0005-map-library-maplibre-gl.md) (`maplibre_gl`).
 
 ## Context
 
 The simulator is a static vanilla-JS web app. The goal is one product available on the **web** (GitHub Pages), **Android** and **iOS**, with native-quality gestures, bottom sheets and map performance on phones.
 
 Constraints:
-- the author develops on **Ubuntu, without a Mac**: iOS can be built only on macOS CI runners, and cannot be run locally;
+- the author develops on **Fedora Linux, without a Mac**: iOS can be built only on macOS CI runners, and cannot be run locally;
 - no backend, no API keys, no paid services (OpenFreeMap base map, open data);
 - the app animates 150–300 vehicles today and potentially a few thousand with GTFS (see the [baseline review](../reviews/F0-baseline-review.md#h1--engine-hot-paths-scale-linearly-with-the-number-of-trips-of-the-day)).
 

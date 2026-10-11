@@ -1,0 +1,22 @@
+name: map_spike_gl
+description: F2 map spike with maplibre_gl (not published, removed after F3).
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.7.0 <4.0.0"
+  flutter: ">=3.29.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  maplibre_gl: ^0.27.1
+  map_spike_common:
+    path: ../map_spike_common
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,97 @@
+name: Map spike
+
+# F2: compiles the two map spike apps (maplibre_gl, maplibre) for the web and Android.
+# Results are downloadable artifacts: an arm64 APK to install on a phone and the web build.
+on:
+  push:
+    branches: [f2-map-spike]
+    paths: ["spike/**", ".github/workflows/spike.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: spike-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  common:
+    name: Shared code (analyze, tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: spike/map_spike_common
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7 # pinned: version of the F2 measurements (ADR 0005)
+          cache: true
+      - run: flutter --version
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+
+  app:
+    name: ${{ matrix.app }}
+    needs: common
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [app_maplibre_gl, app_maplibre]
+    defaults:
+      run:
+        working-directory: spike/${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21" # maplibre_gl's Android build targets Java 21
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7 # pinned: version of the F2 measurements (ADR 0005)
+          cache: true
+      - name: Generate platform folders
+        working-directory: .
+        run: bash spike/tool/prepare.sh spike/${{ matrix.app }}
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+      - name: Build web
+        run: flutter build web --release
+      - name: Build Android APK (arm64)
+        run: |
+          flutter build apk --release --target-platform android-arm64
+          mkdir -p apk-out && cp build/app/outputs/flutter-apk/app-release.apk "apk-out/${{ matrix.app }}.apk"
+      # Diagnostics for `maplibre`, whose release APK does not start the map: one build with
+      # Hybrid Composition, one without R8 shrinking (Gradle property `shrink`, read by Flutter).
+      - name: Build diagnostic APK variants (maplibre)
+        if: matrix.app == 'app_maplibre'
+        run: |
+          flutter build apk --release --target-platform android-arm64 --dart-define=ANDROID_MODE=hc
+          cp build/app/outputs/flutter-apk/app-release.apk apk-out/app_maplibre-hc.apk
+          echo "shrink=false" >> android/gradle.properties
+          flutter build apk --release --target-platform android-arm64 --dart-define=SPIKE_VARIANT=no-R8
+          cp build/app/outputs/flutter-apk/app-release.apk apk-out/app_maplibre-no-r8.apk
+      - name: Sizes
+        run: |
+          {
+            echo "### ${{ matrix.app }}"
+            echo "- Flutter: $(flutter --version | head -1)"
+            echo "- web build: $(du -sh build/web | cut -f1) (main.dart.js $(du -h build/web/main.dart.js | cut -f1))"
+            for apk in apk-out/*.apk; do echo "- $(basename "$apk"): $(du -h "$apk" | cut -f1)"; done
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ matrix.app }}
+          path: spike/${{ matrix.app }}/apk-out/*.apk
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-${{ matrix.app }}
+          path: spike/${{ matrix.app }}/build/web
+          retention-days: 30
