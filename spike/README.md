@@ -2,6 +2,8 @@
 
 Throw-away code that decides which Flutter map library the app will use ([ADR 0001](../docs/adr/0001-flutter-multiplatform-app.md)). It is removed after F3.
 
+**Outcome (2026-10-11):** `maplibre_gl` — see [ADR 0005](../docs/adr/0005-map-library-maplibre-gl.md) and the raw numbers in [results/](results/).
+
 ```text
 spike/
 ├── map_spike_common/   # shared: metro geometry, simulated vehicles, measurements, benchmark page (+ tests)

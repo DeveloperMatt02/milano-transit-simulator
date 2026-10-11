@@ -49,7 +49,7 @@ The official guide targets [Linux → Android](https://docs.flutter.dev/get-star
    ```bash
    echo 'export PATH="$HOME/development/flutter/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
    ```
-   Use the same version as CI (printed in the *Map spike* workflow log, pinned at the end of F2).
+   Use **Flutter 3.47.7**, the version pinned in CI ([ADR 0005](adr/0005-map-library-maplibre-gl.md)): from a git checkout of the SDK, `git checkout 3.47.7`; with the downloadable bundle, pick 3.47.7 from the SDK archive.
 3. **Android Studio** — download the Linux `.tar.gz` from developer.android.com, extract it (e.g. to `~/development/android-studio`) and run `bin/studio.sh`. Prefer the tarball over the Flatpak: the Flatpak sandbox hides the Flutter SDK and `adb` from the IDE. From *SDK Manager* install: SDK Platform, Command-line Tools, Build-Tools, Platform-Tools. The bundled JDK (21) is the one the map library needs.
 4. **Phone instead of emulator** — on the OnePlus enable *Developer options* (tap *Build number* seven times) and *USB debugging*, connect it and accept the prompt; `adb devices` must list it. If it shows `no permissions`, unplug/replug after installing `android-tools` (it ships the udev rules) or reboot.
 5. **Emulator (optional)** — needs hardware virtualisation: `grep -cE '(vmx|svm)' /proc/cpuinfo` must print 1 or more, and your user must be able to open `/dev/kvm` (`sudo usermod -aG kvm $USER`, then log out and in). In *Device Manager* create a device with an x86_64 image.

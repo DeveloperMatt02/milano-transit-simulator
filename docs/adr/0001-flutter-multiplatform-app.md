@@ -1,6 +1,6 @@
 # ADR 0001 · Flutter for the multiplatform app
 
-**Status:** Accepted (2026-10-10). The map library is decided by the F2 spike and recorded in a follow-up ADR (0005).
+**Status:** Accepted (2026-10-10). Spike passed and map library chosen on 2026-10-11: [ADR 0005](0005-map-library-maplibre-gl.md) (`maplibre_gl`).
 
 ## Context
 
