@@ -4,7 +4,7 @@
 
 ## Context
 
-The F2 spike ([spike/](../../spike/README.md)) rendered the metro network with 150–3,000 moving vehicles, pushed to a GeoJSON source every frame or at 10 Hz, with two candidate libraries behind the same `MapBackend` interface. Builds: Flutter 3.47.7, arm64 release APKs from GitHub Actions. Device: the author's OnePlus Nord 4 (display at 90 Hz during the runs). Raw results: [maplibre_gl](../../spike/results/2026-10-10-oneplus-nord4-maplibre_gl.md), [maplibre](../../spike/results/2026-10-10-oneplus-nord4-maplibre.md).
+The F2 spike (archived: [docs/benchmarks/f2-map-spike](../benchmarks/f2-map-spike/README.md)) rendered the metro network with 150–3,000 moving vehicles, pushed to a GeoJSON source every frame or at 10 Hz, with two candidate libraries behind the same `MapBackend` interface. Builds: Flutter 3.47.7, arm64 release APKs from GitHub Actions. Device: the author's OnePlus Nord 4 (display at 90 Hz during the runs). Raw results: [maplibre_gl](../benchmarks/f2-map-spike/2026-10-10-oneplus-nord4-maplibre_gl.md), [maplibre](../benchmarks/f2-map-spike/2026-10-10-oneplus-nord4-maplibre.md).
 
 | | `maplibre_gl` 0.27.1 (maplibre.org) | `maplibre` 0.3.6 (josxha) |
 | --- | --- | --- |
@@ -45,4 +45,4 @@ Design consequences for F4 (from the measurements):
 ## Consequences
 
 - Flutter is pinned to **3.47.7** in CI (the version used for the measurements) and on the author's PC.
-- The `spike/` folder stays until the end of F3 as a reference, then is removed.
+- The `spike/` folder stayed until the end of F3 as a reference and was then removed; results and lessons are in [docs/benchmarks/f2-map-spike](../benchmarks/f2-map-spike/README.md), the code in git history (commit `fae2cc7`).

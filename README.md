@@ -137,6 +137,7 @@ milano-transit-simulator/
 │   ├── app.js                  # UI controller
 │   └── data/                   # Generated datasets (metro network, frequencies, surface network)
 ├── scripts/                    # Python data pipeline
+├── packages/transit_core/      # Dart engine for the upcoming Flutter app (GTFS + synthetic timetables)
 ├── tests/
 │   ├── js/                     # node:test suites
 │   └── python/                 # unittest suites

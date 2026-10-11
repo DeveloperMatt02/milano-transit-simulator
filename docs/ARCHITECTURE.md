@@ -18,6 +18,7 @@
 8. [Data pipeline](#8-data-pipeline)
 9. [Testing and CI/CD](#9-testing-and-cicd)
 10. [Design decisions](#10-design-decisions)
+11. [Dart core for the Flutter app](#11-dart-core-for-the-flutter-app)
 
 ---
 
@@ -179,8 +180,10 @@ Raw files are git-ignored; generated files are committed so that the site needs 
 | `tests/js/i18n.test.js` | `node:test` | Dictionary parity and key coverage |
 | `tests/js/themes.test.js` | `node:test` | Theme resolution, OpenFreeMap styles, WCAG AA contrast of every line badge |
 | `tests/python/test_pipeline.py` | `unittest` | Time normalisation, frequency aggregation, 24-hour and night routes, network builder |
+| `tests/python/test_gtfs.py` | `unittest` | GTFS pipeline on a mini feed with the real feed's quirks; opt-in smoke test on the real feed |
+| `packages/transit_core/test/` | `dart test` | Dart core: parity with the JS engine, GTFS fixture, schedule composition, engine indexes, clock; opt-in real-feed test |
 
-GitHub Actions runs both suites on every push and pull request (`.github/workflows/ci.yml`) and deploys the site to GitHub Pages on every push to `main` (`.github/workflows/pages.yml`).
+GitHub Actions runs the JS and Python suites on every push and pull request (`.github/workflows/ci.yml`), deploys the site to GitHub Pages after the tests on every push to `main` and twice a week with fresh GTFS data (`.github/workflows/pages.yml`), and checks the Dart core — golden data up to date, analysis, tests, benchmark budgets, smoke test on the real feed (`.github/workflows/core.yml`).
 
 ## 10. Design decisions
 
@@ -192,3 +195,22 @@ GitHub Actions runs both suites on every push and pull request (`.github/workflo
 | Stateless vehicle positions | Position is a pure function of `(trip, time)`: scrubbing the timeline or running at 60× needs no incremental state and cannot drift |
 | Service-day time (03:00 → 27:00) | Late-night trips stay on the same timeline as the rest of the day instead of vanishing at midnight |
 | Deterministic timetable | The same input always gives the same trains, which keeps the app testable |
+
+## 11. Dart core for the Flutter app
+
+From roadmap phase F3 the engine also exists as a pure Dart package, [`packages/transit_core`](../packages/transit_core/README.md), which the Flutter app (F4) will use. It is a port of `utils.js`, `scheduler.js` and the engine part of `simulation-engine.js`, plus what the Lite app does not have:
+
+```mermaid
+graph LR
+    G[(data/gtfs/*.json<br/>build_gtfs.py)] --> D(GtfsDataset)
+    J[(js/data/*.js)] --> S(SyntheticScheduler)
+    D --> C(ScheduleComposer<br/>GTFS or synthetic,<br/>line by line, day by day)
+    S --> C
+    C --> E(TransitEngine<br/>time buckets, per-place index)
+    K(SimulationClock<br/>Milan CET/CEST) --> E
+```
+
+* **ScheduleComposer** applies ADR 0004: a line uses GTFS times on a service day when the dataset covers it, otherwise the synthetic timetable; `estimatedLines` feeds the "estimated times" notice.
+* **TransitEngine** returns the same vehicles and boards as the JS engine (parity tests on recorded JS output) but visits only the trips of one 5-minute bucket per frame and only the trips serving a place per board.
+* **Milan time** is computed with the EU summer-time rule, so the app needs no time-zone database on any platform.
+

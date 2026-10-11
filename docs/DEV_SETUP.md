@@ -23,17 +23,23 @@ GTFS_REAL=1 python3 -m unittest tests.python.test_gtfs.RealFeed   # optional smo
 
 In CI the deploy workflow downloads and builds it by itself (Monday and Thursday, plus every push to `main`).
 
-## F2 · Map spike (no local toolchain)
+## F3 · Dart core (no local toolchain needed)
 
-The spike apps are compiled by GitHub Actions (`.github/workflows/spike.yml`): every push to the `f2-map-spike` branch produces a web build and an Android APK as downloadable artifacts. To test on an Android phone:
+`packages/transit_core` is pure Dart. GitHub Actions (*Dart core* workflow) analyzes it, runs the tests and the benchmark, and runs a smoke test on the real GTFS feed. Locally, once Flutter is installed (next section), from `packages/transit_core`:
 
-1. GitHub → *Actions* → latest *Map spike* run → *Artifacts* → download `apk-…` and unzip it.
-2. Copy the `.apk` to the phone (USB, cloud drive or e-mail) and open it; Android asks to allow installs from that source once.
-3. In the app press **Run benchmark**, wait for the end, press **Copy results** and paste them in the chat.
+```bash
+dart pub get
+dart test                                            # unit, parity and GTFS fixture tests
+dart run benchmark/engine_benchmark.dart             # timings; --check enforces the budgets
+GTFS_DIR=../../data/gtfs dart test test/real_gtfs_test.dart   # after scripts/build_gtfs.py
+```
 
-The web build is tested by unzipping the `web-…` artifact and serving the folder, e.g. `python3 -m http.server 8000 -d web` and opening <http://localhost:8000>.
+Golden data and fixtures are regenerated from the repository root with `node packages/transit_core/tool/make_golden.js` and `python3 packages/transit_core/tool/make_fixtures.py`.
 
-## F3 onwards · Flutter on Fedora
+The F2 map spike (APKs built by CI and installed on the phone) is archived in [docs/benchmarks/f2-map-spike](benchmarks/f2-map-spike/README.md).
+
+## F4 onwards · Flutter on Fedora
+
 
 The official guide targets [Linux → Android](https://docs.flutter.dev/get-started/install/linux/android); on Fedora the steps are the same with `dnf` instead of `apt`:
 

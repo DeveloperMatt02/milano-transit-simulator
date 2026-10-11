@@ -1,0 +1,116 @@
+name: Dart core
+
+# F3: the shared Dart package (packages/transit_core) used by the Flutter app from F4.
+# Checks that the parity data are up to date with js/ and the Python pipeline, then
+# analyzes, tests and benchmarks the package with the pinned Flutter SDK (Dart 3.13).
+on:
+  push:
+    paths:
+      - "packages/transit_core/**"
+      - "js/**"
+      - "scripts/build_gtfs.py"
+      - "scripts/common.py"
+      - "scripts/download_open_data.py"
+      - "tests/python/fixtures/gtfs_mini/**"
+      - ".github/workflows/core.yml"
+  pull_request:
+    paths:
+      - "packages/transit_core/**"
+      - "js/**"
+      - "scripts/build_gtfs.py"
+      - "scripts/common.py"
+      - "scripts/download_open_data.py"
+      - "tests/python/fixtures/gtfs_mini/**"
+      - ".github/workflows/core.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  parity-data:
+    name: Golden data and fixtures up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: JS engine golden (test/golden/js_engine.json)
+        run: node packages/transit_core/tool/make_golden.js --check
+      - name: GTFS fixture (test/fixtures/gtfs_mini)
+        run: python3 packages/transit_core/tool/make_fixtures.py --check
+
+  dart:
+    name: Analyze, test, benchmark
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/transit_core
+    steps:
+      - uses: actions/checkout@v5
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.7 # pinned, same SDK as the F2 spike (ADR 0005)
+          cache: true
+      - run: dart --version
+      - run: dart pub get
+      - run: dart format --output=none --set-exit-if-changed --line-length 120 lib test benchmark
+        continue-on-error: true # style only: reported, not blocking
+      - run: dart analyze --fatal-warnings
+      - run: dart test --reporter expanded
+      - name: Benchmark (budgets enforced)
+        run: dart run benchmark/engine_benchmark.dart --check | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
+
+  real-gtfs:
+    name: Real GTFS feed (smoke test)
+    needs: dart
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # The feed saved by the deploy workflow (main) is reused when the portal is unreachable.
+      - name: Restore the last downloaded feed
+        uses: actions/cache/restore@v4
+        with:
+          path: data/raw
+          key: gtfs-raw-latest
+          restore-keys: gtfs-raw-
+      - name: Download the latest feed
+        continue-on-error: true
+        run: python scripts/download_open_data.py --gtfs --force
+      - name: Build data/gtfs
+        id: build
+        if: hashFiles('data/raw/gtfs.zip') != ''
+        run: python scripts/build_gtfs.py --out data/gtfs
+      - uses: subosito/flutter-action@v2
+        if: steps.build.outcome == 'success'
+        with:
+          channel: stable
+          flutter-version: 3.47.7
+          cache: true
+      - name: Dart engine on the real datasets
+        if: steps.build.outcome == 'success'
+        working-directory: packages/transit_core
+        env:
+          GTFS_DIR: ${{ github.workspace }}/data/gtfs
+        shell: bash
+        run: |
+          dart pub get
+          dart test test/real_gtfs_test.dart --reporter expanded
+          dart run benchmark/engine_benchmark.dart --gtfs "$GTFS_DIR" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: No feed available
+        if: steps.build.outcome != 'success'
+        run: |
+          echo "- no GTFS feed available (portal unreachable and no cache): smoke test skipped" >> "$GITHUB_STEP_SUMMARY"
